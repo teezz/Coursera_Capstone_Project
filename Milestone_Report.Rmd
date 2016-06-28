@@ -1,0 +1,513 @@
+---
+title: "Capstone Project: 1st Milestone Report on NPL"
+author: "TZiegler"
+date: "8 Juni 2016"
+output: html_document
+bibliography: references.bib
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE)
+```
+
+```{r, echo=FALSE}
+setwd("~/code/DataScience/class/10_Capstone_Project/Coursera_Capstone_Project")
+```
+
+
+## 1. Introduction
+The goal of this project is to get familar with the data (US english text from internet news, blog posts and twitter messages) in order to, in the future, build a predictive model. Such a predictive model should suggest possible next words as one is writing text.
+
+## 2. Data Source
+```{r download_data}
+source("download_data.R")
+```
+
+
+## 3. Explenatory data analysis
+The first step in building a predictive model for text is understanding the distribution and relationship between the words, tokens, and phrases in the text. The goal of this task is to understand the basic relationships in the data and prepare to build the first linguistic models.
+
+The second step is to understand the frequencies of words and word pairs:
+- How frequently do certain words appear in the text.
+- How frequently do certain pairs (or triplets) of words appear together.
+
+
+### 3.1 Basic Statistics
+I will build figures and tables to understand variation in the frequencies of words and word pairs in the data. For each file we collect the following information:
+- file size in MB
+- number of lines
+- number of non-empty lines
+- number of words
+- distribution of words (quantiles and plot)
+- number of characters
+- number of non-white characters
+
+
+### 3.2 Summary of the Data
+We are interested in the English textfiles and filter all subdirectories of the data folder for those files with the prefix "en_".
+```
+filez <- list.files(path=data_dir, pattern="^en_.*.txt", recursive=T, full.names=T)
+print(filez)
+```
+
+```{r import_data}
+source("import_data.R")
+```
+
+Build a metrics table
+```{r data_summary}
+source("summary_data.R")
+
+names(metrics) <- c("size(MB)", "num. of lines", "num. of characters", "num. of blanckspace", "num.of.words")
+kable(metrics, digits=5)
+```
+
+
+Next, we print the word frequency in all three files.
+```{r wordfrequency, warning=FALSE}
+suppressMessages(library(ggplot2))
+library(scales)
+library(cowplot)
+
+blog_words <- stri_count_words(blogs)
+news_words <- stri_count_words(news)
+twitter_words <- stri_count_words(twitter)
+
+## Using 'xlim' to show only the relevant parts
+qplot(blog_words, binwidth=1, xlim=c(1, 150))
+```
+
+The most blogs have less then 50 words.
+```{r}
+qplot(news_words, binwidth=1, xlim=c(1, 100))
+```
+
+There is a first peak in the frequency of news words around 5 which may indicates the occurence of headlines in the text. The news text itself in major has between 20 to 40 words.
+```{r}
+p3 <- qplot(twitter_words, binwidth=1, xlim=c(1, 50))
+p3 + scale_y_continuous(labels = comma)
+```
+
+Twitter messages have a  limit of 140 characters (with exceptions for links) and are generally very short.
+
+### Conclusion
+The basic exploration confirms that blog posts use more words than news articles and news articles use much more words than tweets. 
+Nevertheless, I would rather join them into one big dataset, but of course, without loosing any of the caracteristics of each of that file.
+
+
+## 4 Preprocessing
+### 4.1 Building the Corpus
+To get clearer versions of the data, we build one corpus out of the three files, convert uppercase to lower case and remove punctuation, white spaces and affiexes (stemming).
+
+```{r sample_building, echo=FALSE}
+source("sample_data.R")
+```
+
+For this we use the text mining package "quanteda" which is build around the packages "stringi", data.table and "Matrix" and is much faster the the package "tm".
+
+Th profanity list can be downloaded from here:
+https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words
+
+### 4.2 Cleaning the Data
+After thinking more deeply about the cleaning process I refined the cleaning of the data in contrast to the interim report. I now split corpus into sentence and then each sentence into n-grams. If not splitting into sentences the 2- and more grams will be build over sentences, what does not make sense for the prediction. For this I use the segment function from "quanteda" packege with the option 'what="sentences"'.
+
+I tested that on a small corpus:
+```{r}
+sentence.corpus <- segment(en.corpus, what="sentences")
+
+## Example
+## Extract 2 sentences from corpus
+x <- sentence.corpus[1:2]
+## Build the 2-grams
+dfm.2gram <- dfm(x, removeTwitter=TRUE, ngrams=2, ignoredFeatures = c(swear.words, stopwords("english")))
+## Shw the 2-grams
+features(dfm.2gram)
+## Remove the example data again
+rm(x)
+rm(dfm.2gram)
+```
+That works fine. I now have only sentence-wise 2-grams. The **sentence.corpus** will be used for building the n-grams now.
+
+```{r data_cleaning}
+source("cleaning_data.R")
+```
+
+
+
+#### Number of words vs. corpus covered
+```{r}
+num.tokens <- sum(summary(sentence.corpus)[3])
+
+num.unigrams <- length(features(dfm.unigram))
+
+head(as.data.frame(topfeatures(dfm.unigram, num.unigrams)))
+
+
+summary(dfm.unigram)
+
+```
+
+
+
+
+
+
+## 5. Building the Language Model
+### 5.1 Building n-gram
+In the fields of computational linguistics and probability, an n-gram is a contiguous sequence of n items from a given sequence of text or speech. An n-gram model is a type of probabilistic language model for predicting the next item in such a sequence in the form of a (n − 1)–order Markov model.
+According to Markov's assumption, the probability of a word depends only on the probability of a limited history. Thus means, the probability of a word depends only on the probability of the n previous words. But the higher n is, the more data needed to train.
+
+The following approaches and assumptions where were chosen for purposes ofbuilding an initial model: 
+1. Corpora: Words will not be case-sensitive. Although important for spelling correction and part of speech analysis, the words themselves - not their case - are important for prediction.
+2. Stopwords: All words will be included in the model as they represent more than just the primary carriers of the message. In contrast stopwords should be used for classification and clustering.
+3. Wordform: stemming will not be used as N-Grams are typically based on wordforms (unique, inflected forms of words). Whereas table and tables are the same lemma, they will be treated as separate words in this model.
+4. Punctuation: We separated the sentence in 4.2.
+5. Numbers: there is no intuition based on the research that numbers will have a great impact on a predication model and they will be removed.
+
+
+An n-gram of size 1 is referred to as a "unigram"; size 2 is a "bigram"; size 3 is a "trigram".
+```{r ngrams}
+source("build_ngrams_stop.R")
+source("build_ngrams.R")
+```
+
+
+
+### Theory
+We want to build a model that calculates the probability of the next word **n**:
+```
+P(w_n | w_1, w_2...w_{n-1})
+```
+
+The Chain Rule of Probabilities is:
+```
+P(x_1, x_2, x_3, ..., x_n) = P(x_1)*P(x_2|x_1)*P(x_3|x_1, x_2)...P(x_n|x_1,...,x_{n-1})
+```
+To avoid underflow caused by multiplying small numbers we can add the logs:
+```
+P(x_1)*P(x_2|x_1)*P(x_3|x_1, x_2)...P(x_n|x_1,...,x_{n-1}) = logP(x_1) + logP(x_2|x_1) + logP(x_3|x_1, x_2)...+ logP(x_n|x_1,...,x_{n-1})
+```
+Adding also ist faster than multiplying.
+
+
+In language, however, each word is highly dependent on the previous context. We therefore need the concept of conditional probability in order to make good predictions:
+```
+P (A|B) = P (A ∩ B) / P(B) =
+P(A ∩ B) = P(B) P(A|B)
+```
+
+According to the definition of conditional probability, the probability of seeing word wn given the previous words w1,w2,...wn−1 is:
+```
+P(wn|w1 ...wn−1) = P(w1 ...wn) / P(w1 ...wn−1)
+```
+
+Bigram example
+```
+P(lunch|eat) = P(eat lunch) / P(eat)
+```
+
+Trigram example
+```
+P(lunch|to eat) = P(to eat lunch) / P(to eat)
+```
+
+#### Predicting the next word based on corpus counts (Maximum Likelihood Estimation (MLE))
+We can estimate the conditional probability of seeing word wn by using counts from a corpus:
+```
+P(wn|w1 ...wn−1) = count(w1 ...wn) / count(w1 . . . wn−1)
+```
+
+Bigram example
+```
+P(lunch|eat) = count(eat lunch) / count(eat)
+```
+
+Trigram example
+```
+P(lunch|to eat) = count(to eat lunch) / count(to eat)
+```
+
+Problems occur, when a n-gram is not in the reference corpus. Then MLE assigns zero probability to this n-gram. This is too strict, because there are many good n-grams that just happen to not be in the corpus.
+We can handle unseen n-grams with
+1. Smoothing
+2. Backoff
+3. Interpolation
+
+
+### Smoothing
+Smoothing is a way of assigning a small but non-zero probability to these “zero probability n-grams”
+```{r}
+if (require(data.table))
+        load("data/freq_ngrams_dt.RData")
+        object.size(freq.ngrams.dt)
+        dt <- freq.ngrams.dt
+        rm(freq.ngrams.dt)
+```
+
+
+#### Maximum Likelihood Estimation (MLE)
+```{r}
+## Define a new index row-wise with .I function. This is necessury because when merging the single data.tables each one has a separate index (=rownumber)
+
+## MLE function for 2-grams
+calcMle <- function(freq, word1) {
+        nom <- freq
+        print(nom)
+        denom <- dt[dt[,w1==word1 & is.na(w2)]]$freq
+        mle <- nom/denom
+}
+## MLE function call for 2-grams
+cluster <- makeCluster(detectCores() - 1)
+registerDoParallel(cluster)
+
+dt[dt$ngram==2 & is.na(dt$MLE), MLE := calcMle(freq, w1), by = ..I]
+
+dt[dt[,ngram==2]]
+
+
+x <- dt[w1== n[3] & !is.na(MLE)]
+
+
+```
+
+
+
+#### Kneser-Ney smoothing for n-grams
+```{r, eval=FALSE}
+
+calcKN <- function(dtx) {
+        ## Y = N_c / (N_c + 2N_(c+1)), where N_c is the count of ngrams with count==c (for Kneser-Ney)
+        ## Note: This is a simplified calculation of Y using only the two lowest kept freqs.
+        c1 <- min(dt$freq) ## The lowest available Freq
+        c2 <- min(subset(dt, freq > c1)$freq) ## The second lowest
+        
+        ## D: Calculate Discounting parameter different for freq==1, freq==2 and freq>=3
+        Y <- nrow(dt[freq == c1]) / (nrow(dt[freq == c1]) + 2 * nrow(dt[freq == c2])) 
+        
+        ## D = Discounting parameter different for freq==1, freq==2 and freq>=3
+        ##     Ref Goodman and Chen (1999)
+        dt[, D := 0]
+        dt[freq == 1]$D <- 1 - 2 * Y * (nrow(dt[freq == 2]) / nrow(dt[freq == 1]))
+        dt[freq == 2]$D <- 2 - 3 * Y * (nrow(dt[freq == 3]) / nrow(dt[freq == 2]))
+        dt[freq > 2]$D  <- 3 - 4 * Y * (nrow(dt[freq == 4]) / nrow(dt[freq == 3]))
+        
+        
+        ## Nom = First nominator in P_KN formula ( max{c(w_i-1, w_i)-D, 0} )
+        dt <- dt[, Nom := pmax(freq-D, 0)]
+        
+        
+        ## Continuation count Denominator is the count of the preceding word(s). It differs based on the order of n-grams
+        ## CCN = continuation count for lower order models (2-3-grams)
+        ## CCN = actual count for the highest order model (4-gram)
+        dt <- dt[dt$ngram==1, CCN := sum(freq)]
+        dt <- dt[dt$ngram==2, CCN := sum(freq), by = w1]
+        dt <- dt[dt$ngram==3, CCN := sum(freq), by = list(w2, w1)]
+        dt <- dt[dt$ngram==4, CCN := freq]
+
+
+        ## The λ*Pcont element is the probability reserved for unknown words.
+        ## The lambda λ normalizing constant is used to distribute the probability mass we have discounted with the D’s.
+        ## For every given ngram (e.g. YZ): lambda(Y?) = d / c(Y?) * cont(Y?)
+        ## NWF = number of word types that follows w_i-1 in the training data
+        dt <- dtx
+        dt <- dt[dt$ngram==1, NWF := .N , by = w1]
+        dt <- dt[dt$ngram==2, NWF := .N , by = w1]  # Using data.tables '.N' variable for getting the number of rows per case
+        dt <- dt[dt$ngram==3, NWF := .N , by = list(w2, w1)]
+        dt <- dt[dt$ngram==4, NWF := .N , by = list(w3, w2, w1)]
+        
+        ## L  = Lambda, normalizing constant, the probability mass we've discounted
+        dt[, L := (D / freq) * NWF]
+        
+        
+        ## NBP = Number of different ngrams which ends with next word
+        ## This is different for every ngram.
+        dt <- dt[dt$ngram==2, NBM := .N , by = w2]
+        dt <- dt[dt$ngram==3, NBM := .N , by = w3]
+        dt <- dt[dt$ngram==4, NBM := .N , by = w4]
+        
+        
+        ## PC = P_continuation
+        ## NNG = total number of ngrams per ngram
+        dt <- dt[, NNG := .N, by = ngram]
+
+        dt[, PC := NBM / nrow(dt)] # Count of this novel continuation div. by number of unique grams
+        
+        
+        ## Prob_KN - Estimated Kneser-Ney probability
+        #dt[, P_KN := (Nom/CCN) + L * PC]
+        dt[, P_KN := (Nom/CCN) + ((D/CCN) * NWF) * PC]
+        
+        
+        ## And P_KN as log
+        dt[, P_KN_Log := log(P_KN)] 
+          
+        save(dt, file= "data/dt.kneser_ney.RData")
+        
+        ## Remove obsolete columns
+        #dtx <- dt
+        #dtx[, c("D", "Nom", "CCN", "NWF", "L", "NBM", "PC") :=NULL]
+        
+}
+```
+
+
+Function call for creating the Kneser-Ney smoothing for n-grams
+```{r}
+load("data/freq_ngrams_dt.RData")
+source("calculate_kn.R")
+calculateKN(freq.ngrams.dt)
+```
+
+
+
+
+Q3
+```{r}
+load("data/stop/dt.kneser_ney.RData")
+
+in_string <- "Guy at my table's wife got up to go to the bathroom and I asked about dessert and he started telling me about his"
+if (require(quanteda))
+        tokens <- tokenize(in_string, removePunct = TRUE, simplify = TRUE)
+        from <- length(tokens)-2
+        tokens <- toLower(tokens)
+        n <- tokens[from:length(tokens)]
+        n3 <- n[2:3]
+        n2 <- n[3]
+        
+        search <- c("spiritual", "financial", "horticultural", "martial")
+
+
+```
+
+
+```{r}
+source("predict_kn.R")
+load("data/dt.kneser_ney.RData")
+
+#1
+in_string <- "When you breathe, I want to be the air for you. I'll be there for you, I'd live and I'd"
+## Get time for the calculation
+system.time(predictKN(dtx, in_string))
+results <-predictKN(dtx, in_string)
+search <- c("die", "eat", "give", "sleep")
+if(dim(results[next_word %in% search])[1] != 0) {
+        print(results[next_word %in% search])
+} else {
+        print("Not hit found")
+}
+
+#2
+in_string <- "Guy at my table's wife got up to go to the bathroom and I asked about dessert and he started telling me about his"
+results <- predictKN(dtx, in_string)
+search <- c("spiritual", "financial", "horticultural", "marital")
+if(dim(results[next_word %in% search])[1] != 0) {
+        print(results[next_word %in% search])
+} else {
+        print("Not hit found")
+}
+#=> marital?
+
+#3
+in_string <- "I'd give anything to see arctic monkeys this"
+results <- predictKN(dtx, in_string)
+search <- c("decade", "morning", "month", "weekend")
+if(dim(results[next_word %in% search])[1] != 0) {
+        print(results[next_word %in% search])
+} else {
+        print("Not hit found")
+}
+
+#4
+in_string <- "Talking to your mom has the same effect as a hug and helps reduce your"
+results <- predictKN(dtx, in_string)
+search <- c("happiness", "stress", "hunger", "sleepiness")
+if(dim(results[next_word %in% search])[1] != 0) {
+        print(results[next_word %in% search])
+} else {
+        print("Not hit found")
+}
+
+#5
+in_string <- "When you were in Holland you were like 1 inch away from me but you hadn't time to take a"
+results <- predictKN(dtx, in_string)
+search <- c("walk", "picture", "look", "minute")
+if(dim(results[next_word %in% search])[1] != 0) {
+        print(results[next_word %in% search])
+} else {
+        print("Not hit found")
+}
+
+#6
+in_string <- "I'd just like all of these questions answered, a presentation of evidence, and a jury to settle the"
+results <- predictKN(dtx, in_string)
+search <- c("incident", "matter", "case", "account")
+if(dim(results[next_word %in% search])[1] != 0) {
+        print(results[next_word %in% search])
+} else {
+        print("Not hit found")
+}
+#=> matter?
+
+#7
+in_string <- "I can't deal with unsymetrical things. I can't even hold an uneven number of bags of groceries in each"
+results <- predictKN(dtx, in_string)
+search <- c("arm", "toe", "finger", "hand")
+if(dim(results[next_word %in% search])[1] != 0) {
+        print(results[next_word %in% search])
+} else {
+        print("Not hit found")
+}
+
+#8
+in_string <- "Every inch of you is perfect from the bottom to the"
+results <- predictKN(dtx, in_string)
+search <- c("middle", "center", "top", "side")
+if(dim(results[next_word %in% search])[1] != 0) {
+        print(results[next_word %in% search])
+} else {
+        print("Not hit found")
+}
+
+#9
+in_string <- "I’m thankful my childhood was filled with imagination and bruises from playing"
+results <- predictKN(dtx, in_string)
+search <- c("weekly", "outside", "inside", "daily")
+if(dim(results[next_word %in% search])[1] != 0) {
+        print(results[next_word %in% search])
+} else {
+        print("Not hit found")
+}
+
+#10
+in_string <- "I like how the same people are in almost all of Adam Sandler's"
+results <- predictKN(dtx, in_string)
+#system.time(predictKN(dtx, in_string))
+search <- c("movies", "stories", "pictures", "novels")
+if(dim(results[next_word %in% search])[1] != 0) {
+        print(results[next_word %in% search])
+} else {
+        print("Not hit found")
+}
+
+
+```
+
+
+
+
+
+### Further steps to enhence the model
+
+The number of parameters (number of different n-grams) increase dramatically based on the number of words in the corpus.
+E.g. for a corpus with 20,000 words:
+
+**Model**                       **Parameters**
+1st order (2-gram model)        20,000 x 19,999 = 400 million
+2st order (3-gram model)        20,000^2 x 19,999 = 8 trillion
+3st order (4-gram model)        20,000^3 x 19,999 = 1.6 x 10^17
+
+For this reason, n-gram systems currently use bigrams or trigrams and try to reduce the number of parameters.
+We can reducing the number of parameters with:
+- Stemming
+- Semantic classes
+
+
