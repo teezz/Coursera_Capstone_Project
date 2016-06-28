@@ -15,13 +15,13 @@ predictKN <- function(dtx, in_string) {
                 result4p <- result4[, P_KN]
                 result4ngram <- result4[, ngram]
                 
-                result3 <- dtx[ngram == 3 & w1== n[2] & w2 == n[3] ]
-                result3words <- result3[,w3]
+                result3 <- dtx[ngram == 3 & w2== n[2] & w3 == n[3] ]
+                result3words <- result3[,w4]
                 result3p <- result3[, P_KN]
                 result3ngram <- result3[, ngram]
                 
-                result2 <- dtx[ngram == 2 & w1== n[3] ]
-                result2words <- result2[,w2]
+                result2 <- dtx[ngram == 2 & w3== n[3] ]
+                result2words <- result2[,w4]
                 result2p <- result2[, P_KN]
                 result2ngram <- result2[, ngram]
         }
