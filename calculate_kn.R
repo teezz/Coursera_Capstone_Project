@@ -59,16 +59,19 @@ calculateKN <- function(dtx) {
         
         ## Prob_KN - Estimated Kneser-Ney probability
         #dtx[, P_KN := (Nom/CCN) + L * PC]
-        dtx[, P_KN := (Nom/CCN) + ((D/CCN) * NWF) * PC]
+        dtx[, P := (Nom/CCN) + ((D/CCN) * NWF) * PC]
         
         
-        ## And P_KN as log
-        dtx[, P_KN_Log := log(P_KN)] 
+        ## And P as log
+        dtx[, P_Log := log(P)] 
         
+        dt <- dtx
+        rm(dtx)
         #save(dtx, file= "data/dt.kneser_ney.RData")
-        save(dtx, file= "data/stop/dt.kneser_ney.RData")
+        save(dt, file= "data/dt.kneser_ney_full.RData")
         
         ## Remove obsolete columns
-        dtx[, c("D", "Nom", "CCN", "NWF", "L", "NBM", "PC") :=NULL]
-        
+        dt[, c("D", "Nom", "CCN", "NWF", "L", "NBM", "PC") :=NULL]
+        save(dt, file= "data/dt.kneser_ney.RData")
+        rm(dt)
 }
