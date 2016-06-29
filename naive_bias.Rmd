@@ -1,0 +1,176 @@
+---
+title: "Naive Bias"
+author: "TZiegler"
+date: "25 Juni 2016"
+output: html_document
+---
+
+
+```{r libraries}
+setwd("~/code/DataScience/class/10_Capstone_Project/Coursera_Capstone_Project")
+
+library(data.table)
+library(e1071)
+```
+
+#### Calculate the Naive Bayes Matrix
+```{r}
+load("data/freq_ngrams_dt.RData")
+source("calculate_nb.R")
+calculateNB(freq.ngrams.dt)
+rm(freq.ngrams.dt)
+
+
+```
+
+#### Build mapping table
+```{r}
+load("data/freq_ngrams_dt.RData")
+## Building a lookup vector out of the unigrams
+unigram_levels <- freq.ngrams.dt[ngram==1]$w4
+unigram_levels <- as.data.frame(unigram_levels)
+
+save(unigram_levels, file = "data/mapping_table.RData")
+```
+
+
+#### Build Naive Bayes (NB) Model
+```{r}
+set.seed(1234)
+## Index for building the samples
+load("data/naiveBayes.RData")
+load("data/mapping_table.RData")
+
+## Get only 3-grams
+dt <- dt[ngram==3]
+
+ind <- sample(2, nrow(dt), replace=TRUE, prob=c(0.7, 0.3))
+
+## Remove obsolete cols
+dt[, c("ngram", "..I", "NV", "PC", "X1", "X2", "NC", "CC", "PC_X1", "PC_X2", "P", "P_Log") :=NULL]
+
+## Convert words to factors
+X1 <- factor(dt$w2, levels = unigram_levels[,1])
+X2 <- factor(dt$w3, levels = unigram_levels[,1])
+Y <- factor(dt$w4, levels = unigram_levels[,1])
+freq <- dt$freq
+
+a <- as.data.table(X1)
+b <- as.data.table(X2)
+c <- as.data.table(Y)
+d <- as.data.table(freq)
+dt_trigram <- cbind(a,b,c,d)
+
+train <- dt_trigram[ind==1, ]
+test <- dt_trigram[ind==2, ]
+
+if(require(e1071))
+        tri_naiveBayes <- naiveBayes(Y ~ X1 + X2, data=train)
+
+save(tri_naiveBayes, file = "data/tri_naiveBayes.RData")
+
+```
+
+#### Test the NB model
+```{r}
+# load("/Users/thomas/code/DataScience/class/10_Capstone_Project/examples/Data-Science-Capstone-master/df_trigram.RData")
+load("data/mapping_table.RData")
+
+head(unigram_levels)
+
+# create a test string
+test_string <- "what ever"
+
+# split it into separate words
+test_split <- strsplit(test_string, split = " " )
+
+# encode as a factor using the same levels
+test_factor <- factor(unlist(test_split), levels=unigram_levels[,1])
+
+# transform to data frame
+test_df <- data.frame(X1 = test_factor[1], X2 = test_factor[2])
+
+# estimate using the model
+predict(tri_naiveBayes, test_df)
+```
+
+
+
+
+Test
+```{r}
+source("predict_word.R")
+load("data/naiveBayes.RData")
+
+in_string <- "Guy at my table's wife got up to go to the bathroom and I asked about dessert and he started telling me about his"
+in_string <- "purchase"
+# system.time(predictKN(nb, in_string))
+results <-predictWord(nb, in_string)
+results
+
+```
+
+
+
+
+
+
+
+```{r}
+
+## Remove obsolete columns
+#dtx[, c("D", "Nom", "CCN", "NWF", "L", "NBM", "PC", "NNG", "P_KN", "P_KN_Log") :=NULL]
+
+## Building a lookup vector out of the unigrams
+unigram_levels <- dt[ngram==1]$w4
+
+dt_trigram <- dtx
+
+## Adding the variables X1, X2 and Y for Naive Bias in 3-grams by using the lookup vector "unigram_levels",
+## this returns the inndex number in "unigram_levels"
+# dt_trigram <- dt_trigram[,i1 := match(w1, unigram_levels), by = w1]
+# dt_trigram <- dt_trigram[,i2 := match(w2, unigram_levels), by = w2]
+# dt_trigram <- dt_trigram[,i3 := match(w3, unigram_levels), by = w3]
+# 
+# 
+# dt_trigram <- dt_trigram[, X1 := .N, by = w1]
+# dt_trigram <- dt_trigram[, X2 := .N, by = w2]
+# #dt_trigram <- dt_trigram[, Y := .N, by = w3]
+# dt_trigram <- dtx[, Y := as.factor(w3)]
+
+dt_trigram <- dt_trigram[dt_trigram$ngram== 3, X1 := factor(w1, levels = unigram_levels)]
+dt_trigram <- dt_trigram[dt_trigram$ngram== 3, X2 := factor(w2, levels = unigram_levels)]
+dt_trigram <- dt_trigram[dt_trigram$ngram== 3, Y := factor(w3, levels = unigram_levels)]
+dt_trigram <- dt_trigram[dt_trigram$ngram== 2, X2 := factor(w1, levels = unigram_levels)]
+dt_trigram <- dt_trigram[dt_trigram$ngram== 2, Y := factor(w2, levels = unigram_levels)]
+dt_trigram <- dt_trigram[dt_trigram$ngram== 1, Y := factor(w1, levels = unigram_levels)]
+
+## Remove all 4-grams
+dt_trigram <- dt_trigram[ngram != 4]
+dt_trigram <- dt_trigram[, c("freq", "w1", "w2", "w3", "w4", "ngram", "..I") := NULL]
+
+
+
+```
+
+
+```{r}
+load("data/naiveBayes.RData")
+
+test_string <- "accused of"
+# split it into separate words
+test_split <- strsplit(test_string, split = " " )
+
+# encode as a factor using the same levels
+test_factor <- factor(unlist(test_split), unigram_levels)
+test_factor <- unlist(test_split)
+
+# transform to data frame
+test_df <- data.frame(w1 = test_split[1], w2 = test_split[2])
+
+# estimate using the model
+predict(tri_naiveBayes, test_df)
+```
+
+
+
