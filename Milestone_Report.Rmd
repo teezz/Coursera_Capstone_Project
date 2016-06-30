@@ -362,25 +362,34 @@ calculateKN(freq.ngrams.dt)
 
 Q3
 ```{r}
-load("data/stop/dt.kneser_ney.RData")
+source("predict_word.R")
+load("data/dt.kneser_ney.RData")
+load("data/mapping_table.RData")
 
 in_string <- "Guy at my table's wife got up to go to the bathroom and I asked about dessert and he started telling me about his"
-if (require(quanteda))
-        tokens <- tokenize(in_string, removePunct = TRUE, simplify = TRUE)
-        from <- length(tokens)-2
-        tokens <- toLower(tokens)
-        n <- tokens[from:length(tokens)]
-        n3 <- n[2:3]
-        n2 <- n[3]
+## Get time for the calculation
+system.time(predictKN(dt, in_string))
+
+
+in_string <- "computer best"
+
+if (grepl("\\s$", in_string) == TRUE) {
+        ## if there is a whitespace at the end get tokens
+        results <- predictNextWord(dt, in_string)
         
-        search <- c("spiritual", "financial", "horticultural", "martial")
+} else {
+        ## if there is no whitespace get letters and find supplement letters in most frequent unigrams
+        results <- predictWord(in_string, unigram_levels)
+}
+
+results
 
 
 ```
 
 
 ```{r}
-source("predict_kn.R")
+source("predict_word.R")
 load("data/dt.kneser_ney.RData")
 
 #1
@@ -388,6 +397,8 @@ in_string <- "When you breathe, I want to be the air for you. I'll be there for 
 ## Get time for the calculation
 system.time(predictKN(dtx, in_string))
 results <-predictKN(dtx, in_string)
+results
+
 search <- c("die", "eat", "give", "sleep")
 if(dim(results[next_word %in% search])[1] != 0) {
         print(results[next_word %in% search])
