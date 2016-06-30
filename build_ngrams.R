@@ -40,7 +40,7 @@ df$w4 <- rownames(df)
 df$ngram <- 1 ## Add val 1 for ngram column
 if (require(data.table))
   unigram.freq.dt <- as.data.table(df) ## Convert to data.table
-  unigram.freq.dt <- subset(unigram.freq.dt, freq > 1) ## Removing “singletons” (terms occuring once) by filter ngrams with frequency > 2
+  unigram.freq.dt <- subset(unigram.freq.dt, freq > 1) ## Removing “singletons” (terms occuring once) by filter ngrams with frequency > 1
 
 save(unigram.freq.dt, file= "data/freq_unigram_dt.RData")
 
