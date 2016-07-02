@@ -25,12 +25,11 @@ shinyServer(function(input, output, session) {
         #fluidRow(column(12, verbatimTextOutput("fulltext")))
         
         
-        # You can access the value of the widget with input$text, e.g.
+        # Create reactive values
         my_clicks <- reactiveValues(data1 = NULL, data2 = NULL, data3 = NULL)
         
         observe({
                 #predicted <- predict_data()
-                browser()
                 if (input$inText != "") {
                         if (grepl("\\s$", input$inText) == TRUE) {
                                 ## if there is a whitespace at the end get tokens
@@ -40,7 +39,9 @@ shinyServer(function(input, output, session) {
 
                                 predicted <- predicted$next_word
                                 
-                                prediction1$data <- predicted[1]
+                                my_clicks$data1 <- predicted[1]
+                                my_clicks$data2 <- predicted[2]
+                                my_clicks$data3 <- predicted[3]
                                 
                         } else {
                                 ## if there is no whitespace get letters and find supplement letters in most frequent unigrams
@@ -61,21 +62,23 @@ shinyServer(function(input, output, session) {
                         output$prediction_3 <- renderUI({
                                 actionButton("action3", label = predicted[3])
                         })
-                
                 }
-
         })
 
         
         
+        # observeEvent(input$action1, {
+        #         browser()
+        #         # This will change the value of input$inText
+        #         isolate(updateTextInput(session, "inText", value = paste(my_clicks$data1, "")))
+        # })
         
-        
-        
-        observeEvent(input$action1, {
-                
+        predictedVal <- eventReactive(input$action1,{
+                value = paste(my_clicks$data1, "")
+                return(value)
                 # This will change the value of input$inText
-                updateTextInput(session, "inText", value = paste(my_clicks$data1, ""))
+                #isolate(updateTextInput(session, "inText", value = paste(my_clicks$data1, "")))
         })
         
-
+        #updateTextInput(session, "inText", value = predictedVal() )
 })
