@@ -79,7 +79,7 @@ predictWord <- function(in_string, unigram_levels) {
         if (require(quanteda))
                 tokens <- tokenize(toLower(in_string), removePunct = FALSE, simplify = TRUE)
         
-        token <- last(tokens) ## Get last element of a vector or list
+        token <- tail(tokens, n=1) ## Get last element of a vector or list
         
         reg_exp <- paste("^", token, "..*", sep="")
         results <- unigram_levels[grepl(reg_exp, unigram_levels$w4)]
