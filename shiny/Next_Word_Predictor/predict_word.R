@@ -75,17 +75,18 @@ predictNextWord <- function(dtx, in_string) {
 }
 
 
-predictWord <- function(in_string, unigram_levels) {
+predictWord <- function(unigram_levels, in_string) {
         if (require(quanteda))
                 tokens <- tokenize(toLower(in_string), removePunct = FALSE, simplify = TRUE)
         
         token <- tail(tokens, n=1) ## Get last element of a vector or list
         
         reg_exp <- paste("^", token, "..*", sep="")
+        
         results <- unigram_levels[grepl(reg_exp, unigram_levels$w4)]
         results <- results[1:3] ## Get the best 3
         
-        return(results$w4)
+        return(results)
         
         rm(results)
 }

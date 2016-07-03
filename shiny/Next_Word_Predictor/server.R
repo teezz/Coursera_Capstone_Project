@@ -8,7 +8,7 @@
 #
 
 library(shiny)
-library(DT)
+library(data.table)
 library(quanteda)
 source("predict_word.R")
 
@@ -20,6 +20,8 @@ load("data/mapping_table.RData")
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
+        
+        
         output$fulltext <- renderPrint({ input$inText })
 
         #fluidRow(column(12, verbatimTextOutput("fulltext")))
@@ -60,42 +62,44 @@ shinyServer(function(input, output, session) {
                 output$prediction_3 <- renderUI({
                         actionButton("action3", label = predicted[3])
                 })
+                
         })
         
         
         
         predict_data <- reactive({
                 if (input$inText != "" | grepl("[.$]$", input$inText) == TRUE) {
-                        
-                        inText <- last(prepareInString(input$inText))
-                        
                         if (grepl("\\s$", input$inText) == TRUE) {
                                 ## if there is a whitespace at the end get tokens
                                 predicted <- predictNextWord(dt, input$inText)
                                 results_table <- predicted ## output with P and N-grams
                                 output$value <- renderPrint({ results_table })
+                                #browser()
+                                output$statistics <- renderPlot({
+                                        plot(as.factor(predicted$next_word), predicted$P)
+                                })
+                                
                                 
                                 predicted <- predicted$next_word
-                                
-                                # if ( length(prepareInString(input$inText)) == 1) {
-                                #         predicted <- sapply(predicted, .simpleCap)
-                                # }
                                 
                                 my_clicks$data1 <- predicted[1]
                                 my_clicks$data2 <- predicted[2]
                                 my_clicks$data3 <- predicted[3]
                                 return(predicted)
                         } else {
-                                predicted <- predictWord(input$inText, unigram_levels)
+                                predicted <- predictWord(unigram_levels, input$inText)
+                                results_table <- predicted ## most frequent words
+                                output$value <- renderPrint({ results_table })
                                 
-                                #if (grepl("^[^ ].*", last(inText)) == TRUE) { # if there is no preceding whitespace get letters and find supplement letters in most frequent unigrams
+                                predicted <- predicted$w4 # assign only the words
+                                
+                                inText <- last(prepareInString(input$inText))
                                 
                                 if (grepl("\\s.*$", inText) == FALSE) {
                                         predicted <- sapply(predicted, .simpleCap)
                                 } else if (grepl(".\\. *$", inText) == TRUE) { # if there is a dot and whitespace before
                                         predicted <- sapply(predicted, .simpleCap)
                                 } else {
-                                        print("What the ...")
                                         predicted <- predicted
                                 }
                         }
