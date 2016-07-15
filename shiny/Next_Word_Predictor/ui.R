@@ -22,7 +22,7 @@ shinyUI(fluidPage(
                
                 tags$code("The Next Word Predictor uses the Kneser-Ney Smoothing to predict the next word."),
                 hr(),
-                p("Start typing in words in the text input field. As soon as letters are typed in you will see 3 sugestions for word completion. If you enter a whitespace after a word you will see the most probable next words."),
+                p("Start typing in words in the text input field. As soon as letters are typed in you will see 3 sugestions for word completion. If you enter a whitespace after a word you will see the most probable next words. Click one of the buttons to insert the word."),
                
                 textInput("inText", label = h3("Enter your text"), value = "", width = '40%'),
                 
@@ -43,9 +43,9 @@ shinyUI(fluidPage(
                 #fluidRow(column(12, verbatimTextOutput("fulltext")))
                 tabsetPanel(
                        tabPanel("Full text", verbatimTextOutput("fulltext")), 
-                       tabPanel("Statistics", 
-                                plotOutput("statistics")
-                        ), 
+                       # tabPanel("Statistics", 
+                       #          plotOutput("statistics")
+                       #  ), 
                        tabPanel("Instruction", 
                                h4("Instruction"),
                                p('It is very uncomfortable to type on mobile devices like cellphones or tablets. A smart and efficient way for text input is required. The core of this input system is a predictive language model and this shiny app is builded based on n-gram model with Kneser-Ney Smoothing.'),
