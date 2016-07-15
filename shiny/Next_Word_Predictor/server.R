@@ -10,6 +10,7 @@
 library(shiny)
 library(data.table)
 library(quanteda)
+#library(googleVis)
 source("predict_word.R")
 
 # --------- Load the data ---------
@@ -68,18 +69,20 @@ shinyServer(function(input, output, session) {
         
         
         predict_data <- reactive({
-                if (input$inText != "" | grepl("[.$]$", input$inText) == TRUE) {
-                        if (grepl("\\s$", input$inText) == TRUE) {
-                                ## if there is a whitespace at the end get tokens
+                if (input$inText != "") {       #| grepl("[.$]$", input$inText) == TRUE) {
+                        ## Next word when:
+                        ##1: whitespace at end
+                        ##2: no dot at end 
+                        ##3: not dot followed by whitespace at the end
+                        if (grepl("[^.]\\s$", input$inText) == TRUE & grepl("[^.]$", input$inText) == TRUE | grepl("[^\\.]\\s$", input$inText) == TRUE) { ## if there is a whitespace at the end get tokens
                                 predicted <- predictNextWord(dt, input$inText)
                                 results_table <- predicted ## output with P and N-grams
                                 output$value <- renderPrint({ results_table })
-                                #browser()
-                                output$statistics <- renderPlot({
-                                        plot(as.factor(predicted$next_word), predicted$P)
-                                })
                                 
-                                
+                                # output$view <- renderGvis({
+                                #         gvisScatterChart(datasetInput(), options=list(width=500, height=500))
+                                # })
+
                                 predicted <- predicted$next_word
                                 
                                 my_clicks$data1 <- predicted[1]
@@ -95,13 +98,28 @@ shinyServer(function(input, output, session) {
                                 
                                 inText <- last(prepareInString(input$inText))
                                 
-                                if (grepl("\\s.*$", inText) == FALSE) {
+                                if (grepl("[.]\\s[a-zA-Z]$", inText) == T | grepl("[^.]$", inText) == T & grepl("[^\\s]$", inText) == T & grepl("^[a-zA-Z]+$", inText) == T) {
+                                        print("capitalize")
                                         predicted <- sapply(predicted, .simpleCap)
-                                } else if (grepl(".\\. *$", inText) == TRUE) { # if there is a dot and whitespace before
-                                        predicted <- sapply(predicted, .simpleCap)
+                                } else if (grepl("[.]$", inText) == TRUE) {
+                                        print("clear buttons")
+                                        predicted <- c("-", "-", "-")
+                                } else if (grepl("[.]\\s$", inText) == TRUE) {
+                                        print(" clear buttons")
+                                        predicted <- c("-", "-", "-")
                                 } else {
+                                        print(" show normal completion")
                                         predicted <- predicted
                                 }
+
+                                
+                                # if (grepl("[^*\\s$]$", inText) == TRUE & grepl("[^.]$", inText) == TRUE & grepl("[^\\.][^\\s]$", inText) == TRUE) {
+                                #         predicted <- sapply(predicted, .simpleCap)
+                                # } else if (grepl(".*\\.\\s.*$", inText) == TRUE) { # if there is a dot and whitespace before
+                                #          predicted <- sapply(predicted, .simpleCap)
+                                # } else {
+                                #         predicted <- predicted
+                                # }
                         }
 
                         my_clicks$data1 <- predicted[1]
@@ -112,7 +130,7 @@ shinyServer(function(input, output, session) {
         })
 
         shinyjs::onclick("action1",
-                if ( grepl("\\s.*$", prepareInString(input$inText)) == FALSE) {
+                if (grepl("^[a-zA-Z]+$", input$inText) == TRUE) {
                         updateTextInput(session, "inText", value = paste(my_clicks$data1, ""))
                 } else {
                         pre_text <- sub(input$inText, pattern = " [[:alpha:]]*$", replacement = "")
