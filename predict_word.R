@@ -1,7 +1,7 @@
 ## This function uses the Kneser-Ney smoothing for predicting the next word
 
 predictNextWord <- function(dtx, in_string) {
-        if (require(quanteda) & require(data.table))
+        if (require(quanteda))
                 #tokens <- removeFeatures(tokenize(in_string, removePunct = TRUE), stopwords("english"))
                 tokens <- tokenize(toLower(in_string), removePunct = TRUE, simplify = TRUE) ## to lower and remove punctation
         if (length(tokens) > 1) {
@@ -75,7 +75,7 @@ predictNextWord <- function(dtx, in_string) {
 }
 
 
-predictWord <- function(in_string, unigram_levels) {
+predictWord <- function(unigram_levels, in_string) {
         if (require(quanteda))
                 tokens <- tokenize(toLower(in_string), removePunct = FALSE, simplify = TRUE)
         
